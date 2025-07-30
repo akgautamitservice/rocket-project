@@ -5,9 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Contact Me</title>
   <link rel="stylesheet" href="style.css" />
-   <!-- Firebase SDKs -->
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
+  <!-- Firebase SDKs -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+
   <style>
     body {
       margin: 0;
@@ -17,24 +19,36 @@
       background-image: url("https://i.ibb.co/5gNDtcPk/filename.jpg");
       background-size: cover;
       background-position: center;
-      height: 100vh;
+      min-height: 100vh;
       display: flex;
-      justify-content: center;
+      flex-direction: column;
       align-items: center;
+      justify-content: center;
       text-align: center;
     }
-    .contact-info {
-      background-color: rgba(0, 0, 0, 0.6); /* thoda transparent black */
+    .contact-info, .comment-box {
+      background-color: rgba(0, 0, 0, 0.6);
       padding: 30px;
       border-radius: 15px;
-      max-width: 300px;
+      max-width: 400px;
+      margin: 15px;
     }
-    h1 {
-      margin-bottom: 20px;
+    h1, h2, h3 {
+      margin-bottom: 15px;
     }
-    p {
-      font-size: 1.2em;
-      margin: 10px 0;
+    input, textarea {
+      width: 90%;
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      margin-bottom: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #0ff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
     }
     a {
       color: #0ff;
@@ -43,23 +57,67 @@
   </style>
 </head>
 <body class="contact-bg">
+
+  <!-- Contact Info Section -->
   <div class="contact-info">
-    <!-- Comment Form -->
-<div class="contact-info">
-  <h2>Leave a Comment</h2>
-  <form id="commentForm">
-    <input type="text" id="name" placeholder="Your Name" required><br><br>
-    <textarea id="message" placeholder="Write your comment..." required></textarea><br><br>
-    <button type="submit">Post Comment</button>
-  </form>
-  <h3>All Comments:</h3>
-  <div id="commentsContainer"></div>
-</div>
     <h1>Contact No</h1>
     <p>📞 Phone: +919759662377</p>
     <p>📧 Email: amitkumar975966@gmail.com</p>
     <p><a href="about.html">⬅ Back to About</a></p>
   </div>
+
+  <!-- Comment Section -->
+  <div class="comment-box">
+    <h2>Leave a Comment</h2>
+    <form id="commentForm">
+      <input type="text" id="name" placeholder="Your Name" required><br><br>
+      <textarea id="message" placeholder="Write your comment..." required></textarea><br><br>
+      <button type="submit">Post Comment</button>
+    </form>
+
+    <h3>All Comments:</h3>
+    <div id="commentsContainer"></div>
+  </div>
+
+  <!-- Firebase JS -->
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyCc04wI1FXZuRMo-dRrOWLTn_yOqOT0Yko",
+      authDomain: "rocket-project-fd243.firebaseapp.com",
+      databaseURL: "https://rocket-project-fd243-default-rtdb.firebaseio.com",
+      projectId: "rocket-project-fd243",
+      storageBucket: "rocket-project-fd243.firebasestorage.app",
+      messagingSenderId: "794950362930",
+      appId: "1:794950362930:web:d942f0593da45af9be592b",
+      measurementId: "G-STE7S6P79D"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // Submit comment
+    document.getElementById("commentForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const message = document.getElementById("message").value.trim();
+      if (name && message) {
+        database.ref("comments").push({ name, message });
+        document.getElementById("commentForm").reset();
+      }
+    });
+
+    // Display comments
+    const commentsContainer = document.getElementById("commentsContainer");
+    database.ref("comments").on("value", function (snapshot) {
+      commentsContainer.innerHTML = "";
+      snapshot.forEach(function (childSnapshot) {
+        const data = childSnapshot.val();
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${data.name}</strong>: ${data.message}`;
+        commentsContainer.appendChild(div);
+      });
+    });
+  </script>
+
 </body>
 </html>
-
