@@ -8,8 +8,8 @@
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
   <style>
     body {
@@ -55,6 +55,16 @@
       color: #0ff;
       text-decoration: underline;
     }
+    /* Delete button style */
+    .delete-btn {
+      float: right;
+      background: #f44336;
+      color: white;
+      border: none;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
   </style>
 </head>
 <body class="contact-bg">
@@ -66,11 +76,13 @@
     <p>📧 Email: amitkumar975966@gmail.com</p>
     <p><a href="about.html">⬅ Back to About</a></p>
   </div>
-<div id="loginDiv">
-  <input type="email" id="email" placeholder="Admin Email" />
-  <input type="password" id="password" placeholder="Password" />
-  <button onclick="login()">Login as Admin</button>
-</div>
+
+  <!-- Admin Login Section -->
+  <div id="loginDiv">
+    <input type="email" id="email" placeholder="Admin Email" />
+    <input type="password" id="password" placeholder="Password" />
+    <button onclick="login()">Login as Admin</button>
+  </div>
 
   <!-- Comment Section -->
   <div class="comment-box">
@@ -84,70 +96,112 @@
     <h3>All Comments:</h3>
     <div id="commentsContainer"></div>
   </div>
-  <!-- Firebase JS -->
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyCc04wI1FXZuRMo-dRrOWLTn_yOqOT0Yko",
-    authDomain: "rocket-project-fd243.firebaseapp.com",
-    databaseURL: "https://rocket-project-fd243-default-rtdb.firebaseio.com",
-    projectId: "rocket-project-fd243",
-    storageBucket: "rocket-project-fd243.firebasestorage.app",
-    messagingSenderId: "794950362930",
-    appId: "1:794950362930:web:d942f0593da45af9be592b",
-    measurementId: "G-STE7S6P79D"
-  };
 
-  firebase.initializeApp(firebaseConfig);
-  const database = firebase.database();
+  <!-- Firebase & App JS -->
+  <script>
+    // Your Firebase config here:
+    const firebaseConfig = {
+      apiKey: "AIzaSyCc04wI1FXZuRMo-dRrOWLTn_yOqOT0Yko",
+      authDomain: "rocket-project-fd243.firebaseapp.com",
+      databaseURL: "https://rocket-project-fd243-default-rtdb.firebaseio.com",
+      projectId: "rocket-project-fd243",
+      storageBucket: "rocket-project-fd243.firebasestorage.app",
+      messagingSenderId: "794950362930",
+      appId: "1:794950362930:web:d942f0593da45af9be592b",
+      measurementId: "G-STE7S6P79D"
+    };
 
-  // Submit comment
-  document.getElementById("commentForm").addEventListener("submit", function (e) {
-    e.preventDefault();
-    const name = document.getElementById("name").value.trim();
-    const message = document.getElementById("message").value.trim();
-    if (name && message) {
-      database.ref("comments").push({ name, message });
-      document.getElementById("commentForm").reset();
-    }
-  });
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const auth = firebase.auth();
 
-  // Display comments with Delete button
-  const commentsContainer = document.getElementById("commentsContainer");
-  database.ref("comments").on("value", function (snapshot) {
-    commentsContainer.innerHTML = "";
-    snapshot.forEach(function (childSnapshot) {
-      const key = childSnapshot.key;  // Unique comment ID
-      const data = childSnapshot.val();
+    const commentsContainer = document.getElementById("commentsContainer");
+    const loginDiv = document.getElementById("loginDiv");
+    const ADMIN_EMAIL = "amitkumar975966@gmail.com";
 
-      const div = document.createElement("div");
-      div.style.marginBottom = "10px";
-      div.style.padding = "10px";
-      div.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
-      div.style.borderRadius = "8px";
-      div.style.textAlign = "left";
+    // Login function
+    function login() {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value.trim();
 
-      div.innerHTML = `
-        <strong>${data.name}</strong>: ${data.message}
-        <button style="float:right; background:#f44336; color:white; border:none; padding:5px 10px; border-radius:5px; cursor:pointer;"
-          onclick="deleteComment('${key}')">Delete</button>
-      `;
-
-      commentsContainer.appendChild(div);
-    });
-  });
-
-  // Delete comment function
-  function deleteComment(commentKey) {
-    const confirmDelete = confirm("Are you sure you want to delete this comment?");
-    if (confirmDelete) {
-      database.ref("comments").child(commentKey).remove()
+      auth.signInWithEmailAndPassword(email, password)
         .then(() => {
-          alert("Comment deleted successfully.");
+          alert("Logged in as admin!");
+          loginDiv.style.display = "none";
+          document.getElementById("email").value = "";
+          document.getElementById("password").value = "";
         })
-        .catch((error) => {
-          alert("Error deleting comment: " + error.message);
+        .catch(error => {
+          alert("Login failed: " + error.message);
         });
     }
-  }
-</script>
+
+    // Auth state listener
+    auth.onAuthStateChanged(user => {
+      if (user) {
+        loginDiv.style.display = "none";
+        loadComments(user);
+      } else {
+        loginDiv.style.display = "block";
+        commentsContainer.innerHTML = "";
+      }
+    });
+
+    // Submit comment
+    document.getElementById("commentForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const name = document.getElementById("name").value.trim();
+      const message = document.getElementById("message").value.trim();
+      if (name && message) {
+        database.ref("comments").push({ name, message, timestamp: Date.now() });
+        this.reset();
+      }
+    });
+
+    // Load comments with admin delete button
+    function loadComments(user) {
+      database.ref("comments").orderByChild("timestamp").on("value", snapshot => {
+        commentsContainer.innerHTML = "";
+        snapshot.forEach(childSnapshot => {
+          const key = childSnapshot.key;
+          const data = childSnapshot.val();
+
+          const div = document.createElement("div");
+          div.style.marginBottom = "10px";
+          div.style.padding = "10px";
+          div.style.backgroundColor = "rgba(255, 255, 255, 0.1)";
+          div.style.borderRadius = "8px";
+          div.style.textAlign = "left";
+
+          div.innerHTML = `<strong>${escapeHtml(data.name)}</strong>: ${escapeHtml(data.message)}`;
+
+          if (user.email === ADMIN_EMAIL) {
+            const delBtn = document.createElement("button");
+            delBtn.textContent = "Delete";
+            delBtn.className = "delete-btn";
+            delBtn.onclick = () => {
+              if (confirm("Are you sure you want to delete this comment?")) {
+                database.ref("comments").child(key).remove()
+                  .then(() => alert("Comment deleted successfully."))
+                  .catch(error => alert("Error deleting comment: " + error.message));
+              }
+            };
+            div.appendChild(delBtn);
+          }
+
+          commentsContainer.appendChild(div);
+        });
+      });
+    }
+
+    // Simple escape to prevent XSS
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.appendChild(document.createTextNode(text));
+      return div.innerHTML;
+    }
+  </script>
+
+</body>
+</html>
 
