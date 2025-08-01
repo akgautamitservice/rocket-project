@@ -2,89 +2,201 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Comment Box Test</title>
+  <title>Comment Box with Admin Delete</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: auto;
+      padding: 1em;
+      background: #222;
+      color: white;
+    }
+    #comments-container div {
+      border-bottom: 1px solid #ccc;
+      padding: 0.5em 0;
+    }
+    .delete-btn {
+      color: red;
+      cursor: pointer;
+      margin-left: 10px;
+      background: none;
+      border: none;
+      font-size: 0.9em;
+    }
+    input, textarea, button {
+      font-size: 1em;
+      margin: 5px 0;
+      padding: 8px;
+      border-radius: 5px;
+      border: none;
+    }
+    input, textarea {
+      width: 100%;
+    }
+  </style>
 </head>
 <body>
 
-  <h2>Leave a Comment</h2>
-  <form id="commentForm">
-    <input type="text" id="name" placeholder="Your Name" required /><br/><br/>
-    <textarea id="message" placeholder="Your Comment" required></textarea><br/><br/>
-    <button type="submit">Post Comment</button>
-  </form>
+<h2>Comments Section</h2>
 
-  <h3>All Comments:</h3>
-  <div id="commentsContainer"></div>
+<!-- Login for admin -->
+<div id="auth-section">
+  <input id="email" type="email" placeholder="Email" />
+  <input id="password" type="password" placeholder="Password" />
+  <button id="login-btn">Login</button>
+  <button id="logout-btn" style="display:none;">Logout</button>
+  <div id="login-msg"></div>
+</div>
 
-  <!-- Firebase SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+<!-- Comment form -->
+<div id="comment-section" style="display:none;">
+  <input id="username" placeholder="Your Name" />
+  <textarea id="comment" placeholder="Your Comment"></textarea><br/>
+  <button id="submit-comment">Submit Comment</button>
+</div>
 
-  <script>
-    // Your Firebase config - replace with your actual project details
-    const firebaseConfig = {
-      apiKey: "YOUR_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      databaseURL: "https://YOUR_PROJECT.firebaseio.com",
-      projectId: "YOUR_PROJECT",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "YOUR_SENDER_ID",
-      appId: "YOUR_APP_ID"
-    };
+<h3>All Comments:</h3>
+<div id="comments-container"></div>
 
-    // Initialize Firebase
-    firebase.initializeApp(firebaseConfig);
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
 
-    const database = firebase.database();
+<script>
+  // 1. Firebase config (replace with your config)
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_PROJECT.firebaseapp.com",
+    databaseURL: "https://YOUR_PROJECT.firebaseio.com",
+    projectId: "YOUR_PROJECT",
+    storageBucket: "YOUR_PROJECT.appspot.com",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
 
-    // Submit comment handler
-    document.getElementById("commentForm").addEventListener("submit", function(e) {
-      e.preventDefault();
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.database();
 
-      const name = document.getElementById("name").value.trim();
-      const message = document.getElementById("message").value.trim();
+  const ADMIN_EMAIL = "amitkumar975966@gmail.com";
 
-      if (name && message) {
-        database.ref("comments").push({
-          name: name,
-          message: message,
-          timestamp: Date.now()
-        })
-        .then(() => {
-          this.reset();
-          alert("Comment posted!");
-        })
-        .catch(err => {
-          alert("Error posting comment: " + err.message);
-          console.error(err);
-        });
-      } else {
-        alert("Please fill out both fields.");
-      }
-    });
+  // Elements
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('login-btn');
+  const logoutBtn = document.getElementById('logout-btn');
+  const loginMsg = document.getElementById('login-msg');
 
-    // Load comments from Firebase and display
-    const commentsContainer = document.getElementById("commentsContainer");
-    database.ref("comments").orderByChild("timestamp").on("value", snapshot => {
-      commentsContainer.innerHTML = "";
-      snapshot.forEach(childSnapshot => {
-        const data = childSnapshot.val();
-        const commentDiv = document.createElement("div");
-        commentDiv.style.borderBottom = "1px solid #ccc";
-        commentDiv.style.marginBottom = "10px";
-        commentDiv.style.paddingBottom = "5px";
-        commentDiv.innerHTML = `<strong>${escapeHtml(data.name)}</strong>: ${escapeHtml(data.message)}`;
-        commentsContainer.appendChild(commentDiv);
+  const commentSection = document.getElementById('comment-section');
+  const usernameInput = document.getElementById('username');
+  const commentInput = document.getElementById('comment');
+  const submitCommentBtn = document.getElementById('submit-comment');
+  const commentsContainer = document.getElementById('comments-container');
+
+  let currentUserEmail = null;
+
+  // Login
+  loginBtn.onclick = () => {
+    const email = emailInput.value;
+    const password = passwordInput.value;
+    auth.signInWithEmailAndPassword(email, password)
+      .then(() => {
+        loginMsg.textContent = "Logged in!";
+        emailInput.value = '';
+        passwordInput.value = '';
+      })
+      .catch(error => {
+        loginMsg.textContent = "Error: " + error.message;
+      });
+  };
+
+  // Logout
+  logoutBtn.onclick = () => {
+    auth.signOut();
+  };
+
+  // Auth state change
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      currentUserEmail = user.email;
+      loginMsg.textContent = `Welcome, ${user.email}`;
+      loginBtn.style.display = 'none';
+      logoutBtn.style.display = 'inline-block';
+      emailInput.style.display = 'none';
+      passwordInput.style.display = 'none';
+      commentSection.style.display = 'block';
+      loadComments(user);
+    } else {
+      currentUserEmail = null;
+      loginMsg.textContent = "Please login to comment.";
+      loginBtn.style.display = 'inline-block';
+      logoutBtn.style.display = 'none';
+      emailInput.style.display = 'inline-block';
+      passwordInput.style.display = 'inline-block';
+      commentSection.style.display = 'block'; // Allow commenting even if not logged in?
+      loadComments(null);
+    }
+  });
+
+  // Submit comment
+  submitCommentBtn.onclick = () => {
+    const name = usernameInput.value.trim();
+    const comment = commentInput.value.trim();
+
+    if (!name || !comment) {
+      alert("Please enter your name and comment.");
+      return;
+    }
+
+    db.ref('comments').push({
+      name: name,
+      comment: comment,
+      timestamp: Date.now()
+    }).then(() => {
+      usernameInput.value = '';
+      commentInput.value = '';
+    }).catch(err => alert("Error posting comment: " + err.message));
+  };
+
+  // Load comments from Firebase
+  function loadComments(user) {
+    db.ref('comments').orderByChild('timestamp').on('value', snapshot => {
+      commentsContainer.innerHTML = '';
+      snapshot.forEach(child => {
+        const data = child.val();
+        const key = child.key;
+
+        const div = document.createElement('div');
+        div.innerHTML = `<strong>${escapeHtml(data.name)}</strong>: ${escapeHtml(data.comment)}`;
+
+        // Show delete button only if user is admin
+        if (user && user.email === ADMIN_EMAIL) {
+          const delBtn = document.createElement('button');
+          delBtn.textContent = 'Delete';
+          delBtn.className = 'delete-btn';
+          delBtn.onclick = () => {
+            if (confirm('Are you sure to delete this comment?')) {
+              db.ref('comments/' + key).remove();
+            }
+          };
+          div.appendChild(delBtn);
+        }
+
+        commentsContainer.appendChild(div);
       });
     });
+  }
 
-    // Simple XSS prevention
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-  </script>
+  // Simple HTML escape
+  function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.appendChild(document.createTextNode(text));
+    return div.innerHTML;
+  }
+</script>
+
 </body>
 </html>
+
